@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>機器人迷宮逃脫 v0.13 - 容器型結構化教學</title>
+    <title>機器人迷宮逃脫 v0.14 - 相對方位與結構化教學</title>
     <style>
         :root {
             --primary-bg: #1a1a2e;
@@ -90,9 +90,9 @@
             display: flex; justify-content: space-between; align-items: center; font-size: 0.9em;
             border-left: 3px solid var(--block-loop);
         }
-        .loop-actions { display: flex; gap: 5px; }
+        .loop-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
         .loop-actions button {
-            flex: 1; padding: 6px; border: none; border-radius: 4px;
+            padding: 6px; border: none; border-radius: 4px;
             background: #2c3e50; color: white; cursor: pointer; border: 1px solid var(--block-loop);
         }
         .loop-actions button:hover { background: var(--block-loop); }
@@ -115,13 +115,13 @@
 
 <div id="overlay">
     <div class="modal">
-        <h2>🤖 機器人迷宮逃脫 v0.13</h2>
-        <p>「容器型積木」讓你輕鬆學習巢狀迴圈！</p>
+        <h2>🤖 機器人迷宮逃脫 v0.14</h2>
+        <p>理解「相對方位」與「容器結構」！</p>
         <div style="text-align: left; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; font-size: 0.9em; line-height: 1.5;">
-            📍 <b>操作重點：</b><br>
-            • 加入「重複積木」後，它會產生一個專屬的橘色框框。<br>
-            • 請直接點擊<b>橘色框框下方的小按鈕</b>，把動作放進迴圈裡！<br>
-            • 不再需要手動設定「結束」位置，框框包住的都會重複執行。
+            📍 <b>核心觀念：</b><br>
+            • <b>相對方位：</b>「前進」與「後退」都是依據機器人目前的「臉朝向哪裡」來決定。<br>
+            • <b>重複容器：</b>建立重複積木後，直接點擊框內的按鈕即可加入動作。<br>
+            • <b>拖曳視角：</b>滑鼠左鍵或手機單指拖曳地圖，滾輪縮放。
         </div>
         <button class="run-btn" style="margin-top:20px;" onclick="document.getElementById('overlay').style.display='none'">開始學習</button>
     </div>
@@ -134,6 +134,7 @@
         <div class="section-title">指令積木盒</div>
         <div class="block-group">
             <button class="cmd-btn btn-move" onclick="addCommand('FORWARD', '⬆️ 前進 1 格')">⬆️ 前進</button>
+            <button class="cmd-btn btn-move" onclick="addCommand('BACKWARD', '⬇️ 後退 1 格')">⬇️ 後退</button>
             <button class="cmd-btn btn-move" onclick="addCommand('LEFT', '↩️ 左轉 90°')">↩️ 左轉</button>
             <button class="cmd-btn btn-move" onclick="addCommand('RIGHT', '↪️ 右轉 90°')">↪️ 右轉</button>
             <button class="cmd-btn btn-loop" onclick="addLoop()">🔁 建立「重複積木」容器</button>
@@ -169,8 +170,8 @@ const GRID_SIZE = 60;
 const ROWS = MAZE.length;
 const COLS = MAZE[0].length;
 
-let robot = { x: 1, y: 1, dir: 0 }; 
-let program = []; // 直接使用樹狀結構陣列
+let robot = { x: 1, y: 1, dir: 0 }; // 0:右, 1:下, 2:左, 3:上
+let program = []; 
 let isRunning = false;
 let camera = { x: 0, y: 0, zoom: 1, isDragging: false, lastMouse: {x:0, y:0}, lastDist: 0 };
 
@@ -218,41 +219,34 @@ function setupInputs() {
 }
 
 // --- 容器型積木管理邏輯 ---
-
-// 新增一般指令到主程式
 function addCommand(type, label) {
     if (isRunning) return;
     program.push({ type, label });
     renderProgramList();
 }
 
-// 新增一個「迴圈容器」
 function addLoop() {
     if (isRunning) return;
     let times = prompt("請輸入要重複的次數 (例如: 3)：", "3");
     times = parseInt(times);
     if (!isNaN(times) && times > 0) {
-        // 迴圈本身就是一個帶有 children 陣列的節點
         program.push({ type: 'LOOP', times: times, children: [] });
         renderProgramList();
     }
 }
 
-// 專門為特定的迴圈容器新增子指令
 function addCommandToLoop(loopIndex, type, label) {
     if (isRunning) return;
     program[loopIndex].children.push({ type, label });
     renderProgramList();
 }
 
-// 刪除主程式層級的指令
 function removeCommand(index) {
     if (isRunning) return;
     program.splice(index, 1);
     renderProgramList();
 }
 
-// 刪除迴圈容器內的子指令
 function removeChildCommand(loopIndex, childIndex) {
     if (isRunning) return;
     program[loopIndex].children.splice(childIndex, 1);
@@ -266,13 +260,11 @@ function clearProgram() {
     renderProgramList();
 }
 
-// 渲染 UI：分離一般指令與容器積木的呈現方式
 function renderProgramList() {
     let html = '';
     
     program.forEach((cmd, i) => {
         if (cmd.type === 'LOOP') {
-            // 渲染容器內的子指令
             let childrenHtml = cmd.children.map((child, j) => `
                 <div class="loop-child-step">
                     <span>${j+1}. ${child.label}</span>
@@ -280,7 +272,6 @@ function renderProgramList() {
                 </div>
             `).join('');
 
-            // 渲染容器外框與專屬新增按鈕
             html += `
                 <div class="loop-container">
                     <div class="loop-header">
@@ -292,6 +283,7 @@ function renderProgramList() {
                     </div>
                     <div class="loop-actions">
                         <button onclick="addCommandToLoop(${i}, 'FORWARD', '⬆️ 前進 1 格')">+ ⬆️ 前進</button>
+                        <button onclick="addCommandToLoop(${i}, 'BACKWARD', '⬇️ 後退 1 格')">+ ⬇️ 後退</button>
                         <button onclick="addCommandToLoop(${i}, 'LEFT', '↩️ 左轉 90°')">+ ↩️ 左轉</button>
                         <button onclick="addCommandToLoop(${i}, 'RIGHT', '↪️ 右轉 90°')">+ ↪️ 右轉</button>
                     </div>
@@ -299,7 +291,6 @@ function renderProgramList() {
                 </div>
             `;
         } else {
-            // 渲染一般指令
             html += `
                 <div class="normal-step">
                     <span>${i+1}. ${cmd.label}</span>
@@ -318,16 +309,16 @@ async function executeProgram() {
     robot = { x: 1, y: 1, dir: 0 };
     document.getElementById('runBtn').innerText = "執行中...";
 
-    // 直接遞迴執行已經建立好的樹狀結構陣列
     async function runTree(nodes) {
         for (let node of nodes) {
             if (!isRunning) break;
-            if (node.type === 'FORWARD') await moveOneStep();
+            if (node.type === 'FORWARD') await moveRobot(1);
+            else if (node.type === 'BACKWARD') await moveRobot(-1);
             else if (node.type === 'LEFT') { robot.dir = (robot.dir + 3) % 4; await sleep(400); }
             else if (node.type === 'RIGHT') { robot.dir = (robot.dir + 1) % 4; await sleep(400); }
             else if (node.type === 'LOOP') {
                 for (let i = 0; i < node.times; i++) {
-                    await runTree(node.children); // 執行容器內的子指令
+                    await runTree(node.children);
                 }
             }
         }
@@ -342,9 +333,13 @@ async function executeProgram() {
     document.getElementById('runBtn').innerText = "▶ 執行程式";
 }
 
-async function moveOneStep() {
+// 統整前後移動邏輯 (step: 1 為前進，-1 為後退)
+async function moveRobot(step) {
     let nx = robot.x, ny = robot.y;
-    if (robot.dir === 0) nx++; else if (robot.dir === 1) ny++; else if (robot.dir === 2) nx--; else if (robot.dir === 3) ny--;
+    if (robot.dir === 0) nx += step;
+    else if (robot.dir === 1) ny += step;
+    else if (robot.dir === 2) nx -= step;
+    else if (robot.dir === 3) ny -= step;
 
     // 嚴謹邊界防護
     if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS) {
