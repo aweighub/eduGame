@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>資安守護城堡 v0.1 - 資訊安全教育塔防</title>
+    <style>
+        :root {
+            --bg-color: #0a0e14;
+            --panel-color: rgba(20, 30, 48, 0.9);
+            --accent-color: #00d4ff;
+            --text-color: #ffffff;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: "Microsoft JhengHei", sans-serif;
+            touch-action: none; /* 禁用瀏覽器默認觸控行為以利手勢操作 */
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+            cursor: grab;
+        }
+
+        canvas:active {
+            cursor: grabbing;
+        }
+
+        /* UI 介面 */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .stats-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: var(--panel-color);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid var(--accent-color);
+            color: var(--text-color);
+            pointer-events: auto;
+        }
+
+        .tower-shop {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background: var(--panel-color);
+            padding: 15px;
+            border-radius: 15px;
+            border: 1px solid var(--accent-color);
+            pointer-events: auto;
+        }
+
+        .tower-item {
+            width: 60px;
+            height: 60px;
+            background: #1a2a3a;
+            border: 2px solid #444;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #ddd;
+            transition: 0.2s;
+        }
+
+        .tower-item:hover {
+            border-color: var(--accent-color);
+            background: #243b55;
+        }
+
+        .tower-item.selected {
+            border-color: #ffde00;
+            box-shadow: 0 0 10px #ffde00;
+        }
+
+        .tower-icon {
+            font-size: 20px;
+            margin-bottom: 2px;
+        }
+
+        /* 遊戲說明 */
+        #intro-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            color: white;
+            text-align: center;
+        }
+
+        .intro-content {
+            max-width: 500px;
+            padding: 30px;
+            background: #16222a;
+            border: 2px solid var(--accent-color);
+            border-radius: 20px;
+        }
+
+        button {
+            padding: 10px 25px;
+            margin-top: 20px;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 5px;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        @media (max-width: 600px) {
+            .tower-shop { width: 90%; justify-content: space-around; }
+            .stats-panel { font-size: 14px; padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="stats-panel">
+            <div>🏰 城堡血量: <span id="hp">100</span></div>
+            <div>💰 資源點數: <span id="money">200</span></div>
+            <div>👾 威脅波數: <span id="wave">1</span></div>
+        </div>
+
+        <div class="tower-shop">
+            <div class="tower-item" onclick="selectTower('firewall', 50, this)">
+                <span class="tower-icon">🔥</span>
+                <span>防火牆($50)</span>
+            </div>
+            <div class="tower-item" onclick="selectTower('antivirus', 100, this)">
+                <span class="tower-icon">🛡️</span>
+                <span>防毒($100)</span>
+            </div>
+            <div class="tower-item" onclick="selectTower('encryption', 150, this)">
+                <span class="tower-icon">🔑</span>
+                <span>加密($150)</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="intro-overlay">
+        <div class="intro-content">
+            <h2>🛡️ 資安守護城堡 v0.1</h2>
+            <p>歡迎來到資安前線！你是資訊官，任務是部署防禦塔，阻擋病毒與駭客攻擊，保護中央伺服器資料安全。</p>
+            <ul style="text-align: left;">
+                <li>🔥 <b>防火牆：</b> 基礎設施，阻擋連線威脅。</li>
+                <li>🛡️ <b>防毒軟體：</b> 快速掃描，對付大量小病毒。</li>
+                <li>🔑 <b>資料加密：</b> 重裝防禦，對付頑固威脅。</li>
+            </ul>
+            <p><small>電腦：滾輪縮放、左鍵拖曳<br>手機：雙指縮放、單指拖曳與點選</small></p>
+            <button onclick="startGame()">開始守護</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * 資安守護城堡 - 核心邏輯
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const hpEl = document.getElementById('hp');
+const moneyEl = document.getElementById('money');
+const waveEl = document.getElementById('wave');
+
+// 遊戲狀態
+let gameActive = false;
+let hp = 100;
+let money = 200;
+let wave = 1;
+let enemies = [];
+let towers = [];
+let projectiles = [];
+let selectedTowerType = null;
+let selectedTowerCost = 0;
+
+// 地圖設置 (大於屏幕，用於縮放拖曳)
+const WORLD_SIZE = 2000;
+const GRID_SIZE = 50;
+const castlePos = { x: 1800, y: 1000 };
+
+// 視角控制器 (Camera Control)
+let camera = {
+    x: -WORLD_SIZE/2 + window.innerWidth/2,
+    y: -WORLD_SIZE/2 + window.innerHeight/2,
+    zoom: 0.8,
+    isDragging: false,
+    lastMouse: { x: 0, y: 0 },
+    lastTouchDist: 0
+};
+
+// 初始化
+function init() {
+    window.addEventListener('resize', resize);
+    resize();
+    setupInputs();
+    gameLoop();
+}
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+
+function startGame() {
+    document.getElementById('intro-overlay').style.display = 'none';
+    gameActive = true;
+    spawnWave();
+}
+
+// 輸入控制 (支援滑鼠與觸控)
+function setupInputs() {
+    // 滑鼠滾輪縮放
+    canvas.addEventListener('wheel', (e) => {
+        const zoomSpeed = 0.001;
+        camera.zoom -= e.deltaY * zoomSpeed;
+        camera.zoom = Math.max(0.3, Math.min(2, camera.zoom));
+    }, { passive: true });
+
+    // 滑鼠/觸控 共通邏輯
+    const getPos = (e) => {
+        const t = e.touches ? e.touches[0] : e;
+        return { x: t.clientX, y: t.clientY };
+    };
+
+    const startDrag = (e) => {
+        if (e.touches && e.touches.length === 2) {
+            camera.lastTouchDist = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+            return;
+        }
+        camera.isDragging = true;
+        camera.lastMouse = getPos(e);
+    };
+
+    const moveDrag = (e) => {
+        if (e.touches && e.touches.length === 2) {
+            // 雙指縮放
+            const dist = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+            const delta = dist - camera.lastTouchDist;
+            camera.zoom = Math.max(0.3, Math.min(2, camera.zoom + delta * 0.01));
+            camera.lastTouchDist = dist;
+            return;
+        }
+
+        if (!camera.isDragging) return;
+        const pos = getPos(e);
+        const dx = pos.x - camera.lastMouse.x;
+        const dy = pos.y - camera.lastMouse.y;
+        camera.x += dx / camera.zoom;
+        camera.y += dy / camera.zoom;
+        camera.lastMouse = pos;
+    };
+
+    const endDrag = (e) => {
+        if (!camera.isDragging) {
+            // 如果不是拖曳，視為點擊放置塔
+            handleCanvasClick(e);
+        }
+        camera.isDragging = false;
+    };
+
+    canvas.addEventListener('mousedown', startDrag);
+    window.addEventListener('mousemove', moveDrag);
+    window.addEventListener('mouseup', endDrag);
+
+    canvas.addEventListener('touchstart', startDrag);
+    window.addEventListener('touchmove', moveDrag);
+    window.addEventListener('touchend', endDrag);
+}
+
+function handleCanvasClick(e) {
+    if (!selectedTowerType) return;
+    
+    // 取得點擊在世界地圖上的座標
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.changedTouches ? e.changedTouches[0] : e;
+    const clickX = (touch.clientX - rect.left) / camera.zoom - camera.x;
+    const clickY = (touch.clientY - rect.top) / camera.zoom - camera.y;
+
+    // 簡單網格對齊
+    const gx = Math.floor(clickX / GRID_SIZE) * GRID_SIZE;
+    const gy = Math.floor(clickY / GRID_SIZE) * GRID_SIZE;
+
+    if (money >= selectedTowerCost) {
+        towers.push({
+            x: gx + GRID_SIZE/2,
+            y: gy + GRID_SIZE/2,
+            type: selectedTowerType,
+            lastShot: 0,
+            range: selectedTowerType === 'firewall' ? 150 : (selectedTowerType === 'antivirus' ? 120 : 250),
+            cd: selectedTowerType === 'antivirus' ? 300 : 800
+        });
+        money -= selectedTowerCost;
+        updateUI();
+    }
+}
+
+function selectTower(type, cost, el) {
+    document.querySelectorAll('.tower-item').forEach(i => i.classList.remove('selected'));
+    if (selectedTowerType === type) {
+        selectedTowerType = null;
+    } else {
+        selectedTowerType = type;
+        selectedTowerCost = cost;
+        el.classList.add('selected');
+    }
+}
+
+function updateUI() {
+    hpEl.innerText = hp;
+    moneyEl.innerText = money;
+    waveEl.innerText = wave;
+}
+
+// 遊戲循環邏輯
+function spawnWave() {
+    if (!gameActive) return;
+    let count = 5 + wave * 2;
+    let interval = setInterval(() => {
+        enemies.push({
+            x: 100, y: 1000 + (Math.random()*100 - 50),
+            hp: 20 + wave * 10,
+            speed: 1.5 + (Math.random() * wave * 0.1),
+            type: Math.random() > 0.8 ? 'ransomware' : 'virus'
+        });
+        count--;
+        if (count <= 0) {
+            clearInterval(interval);
+            setTimeout(() => { wave++; spawnWave(); updateUI(); }, 15000);
+        }
+    }, 1000);
+}
+
+function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.scale(camera.zoom, camera.zoom);
+    ctx.translate(camera.x, camera.y);
+
+    drawWorld();
+    if (gameActive) updateGame();
+    
+    ctx.restore();
+    requestAnimationFrame(gameLoop);
+}
+
+function drawWorld() {
+    // 繪製背景網格 (資料傳輸路徑)
+    ctx.strokeStyle = '#162d42';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= WORLD_SIZE; x += GRID_SIZE) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke();
+    }
+    for (let y = 0; y <= WORLD_SIZE; y += GRID_SIZE) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_SIZE, y); ctx.stroke();
+    }
+
+    // 城堡 (中央伺服器)
+    ctx.fillStyle = '#00d4ff';
+    ctx.fillRect(castlePos.x - 40, castlePos.y - 40, 80, 80);
+    ctx.fillStyle = '#fff';
+    ctx.fillText("CENTRAL DATA", castlePos.x - 35, castlePos.y - 50);
+}
+
+function updateGame() {
+    const now = Date.now();
+
+    // 更新敵人
+    enemies.forEach((en, index) => {
+        // 向城堡移動
+        const dx = castlePos.x - en.x;
+        const dy = castlePos.y - en.y;
+        const dist = Math.hypot(dx, dy);
+        en.x += (dx / dist) * en.speed;
+        en.y += (dy / dist) * en.speed;
+
+        // 繪製敵人
+        ctx.fillStyle = en.type === 'virus' ? '#ff4d4d' : '#ff00ff';
+        ctx.beginPath(); ctx.arc(en.x, en.y, 10, 0, Math.PI*2); ctx.fill();
+
+        // 到達城堡
+        if (dist < 40) {
+            hp -= 5;
+            enemies.splice(index, 1);
+            updateUI();
+            if (hp <= 0) { gameActive = false; alert("資料外洩！伺服器崩潰。"); location.reload(); }
+        }
+    });
+
+    // 塔攻擊邏輯
+    towers.forEach(t => {
+        // 繪製塔
+        ctx.fillStyle = t.type === 'firewall' ? '#e67e22' : (t.type === 'antivirus' ? '#2ecc71' : '#9b59b6');
+        ctx.fillRect(t.x - 20, t.y - 20, 40, 40);
+
+        // 搜尋敵人
+        if (now - t.lastShot > t.cd) {
+            let target = enemies.find(en => Math.hypot(en.x - t.x, en.y - t.y) < t.range);
+            if (target) {
+                projectiles.push({ x: t.x, y: t.y, tx: target.x, ty: target.y, color: ctx.fillStyle });
+                target.hp -= 10;
+                t.lastShot = now;
+            }
+        }
+    });
+
+    // 子彈動畫
+    projectiles.forEach((p, index) => {
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.tx, p.ty); ctx.stroke();
+        projectiles.splice(index, 1); // 瞬間命中
+    });
+
+    // 移除死亡敵人
+    enemies = enemies.filter(en => {
+        if (en.hp <= 0) { money += 10; updateUI(); return false; }
+        return true;
+    });
+}
+
+init();
+</script>
+</body>
+</html>
