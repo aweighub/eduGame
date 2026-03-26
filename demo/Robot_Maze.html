@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>機器人迷宮逃脫 v0.1 - 結構化程式教學</title>
+    <style>
+        :root {
+            --primary-bg: #1a1a2e;
+            --panel-bg: #16213e;
+            --accent: #4ecca3;
+            --text: #eeeeee;
+            --block-move: #3498db;
+            --block-loop: #e67e22;
+            --block-if: #9b59b6;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background: var(--primary-bg);
+            color: var(--text);
+            font-family: "Microsoft JhengHei", sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            touch-action: none;
+        }
+
+        /* 佈局設計 */
+        #main-layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        @media (max-width: 800px) {
+            #main-layout { flex-direction: column; }
+        }
+
+        /* 遊戲畫布區 */
+        #canvas-container {
+            flex: 3;
+            position: relative;
+            background: #0f3460;
+            cursor: grab;
+        }
+
+        canvas { display: block; }
+
+        /* 程式積木區 */
+        #code-panel {
+            flex: 1.2;
+            background: var(--panel-bg);
+            border-left: 2px solid #0f3460;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .section-title {
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: var(--accent);
+            border-bottom: 1px solid var(--accent);
+            padding-bottom: 5px;
+        }
+
+        /* 指令按鈕 */
+        .block-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .cmd-btn {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        .btn-move { background: var(--block-move); }
+        .btn-loop { background: var(--block-loop); }
+        .btn-if   { background: var(--block-if); }
+
+        /* 程式列表 */
+        #program-list {
+            flex: 1;
+            background: #0a0a1a;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 15px;
+            min-height: 150px;
+            border: 1px dashed #444;
+        }
+
+        .program-step {
+            background: rgba(255,255,255,0.1);
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            font-family: monospace;
+        }
+
+        .remove-btn { color: #ff4d4d; cursor: pointer; font-weight: bold; }
+
+        /* 控制按鈕 */
+        .control-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .run-btn { flex: 2; background: var(--accent); color: #1a1a2e; font-weight: bold; padding: 12px; border-radius: 5px; border: none; cursor: pointer; }
+        .clear-btn { flex: 1; background: #e94560; color: white; border: none; border-radius: 5px; cursor: pointer; }
+
+        /* 說明層 */
+        #overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+            display: flex; align-items: center; justify-content: center; z-index: 100;
+        }
+        .modal {
+            background: var(--panel-bg); padding: 30px; border-radius: 15px; text-align: center; max-width: 80%;
+        }
+    </style>
+</head>
+<body>
+
+<div id="overlay">
+    <div class="modal">
+        <h2>🤖 機器人迷宮逃脫 v0.1</h2>
+        <p>學習目標：循序、重複與選擇結構</p>
+        <p style="text-align: left; font-size: 0.9em;">
+            1. 使用右側指令堆疊你的程式。<br>
+            2. <b>循序：</b> 機器人會按照由上而下的順序執行。<br>
+            3. <b>重複：</b> 使用「重複3次」來簡化路徑。<br>
+            4. <b>選擇：</b> 使用「偵測前方」判斷是否前進。
+        </p>
+        <button class="run-btn" onclick="document.getElementById('overlay').style.display='none'">開始挑戰</button>
+    </div>
+</div>
+
+<div id="main-layout">
+    <div id="canvas-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div id="code-panel">
+        <div class="section-title">指令積木 (指令集)</div>
+        <div class="block-group">
+            <button class="cmd-btn btn-move" onclick="addCommand('FORWARD', '前進 1 格')">前進 1 格</button>
+            <button class="cmd-btn btn-move" onclick="addCommand('RIGHT', '向右轉 90°')">向右轉</button>
+            <button class="cmd-btn btn-move" onclick="addCommand('LEFT', '向左轉 90°')">向左轉</button>
+            <button class="cmd-btn btn-loop" onclick="addCommand('LOOP_3', '重複 3 次 [前進]')">重複 3 次</button>
+        </div>
+
+        <div class="section-title">程式執行清單 (由上而下)</div>
+        <div id="program-list">
+            </div>
+
+        <div class="control-group">
+            <button class="run-btn" onclick="executeProgram()">▶ 執行程式</button>
+            <button class="clear-btn" onclick="clearProgram()">重設</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * 機器人迷宮邏輯與互動系統
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const programListEl = document.getElementById('program-list');
+
+// 迷宮地圖 (0: 通道, 1: 牆壁, 2: 起點, 3: 終點)
+const MAZE = [
+    [1,1,1,1,1,1,1,1],
+    [1,2,0,0,1,0,3,1],
+    [1,1,1,0,1,0,1,1],
+    [1,0,0,0,0,0,0,1],
+    [1,0,1,1,1,1,0,1],
+    [1,0,0,0,1,0,0,1],
+    [1,1,1,0,0,0,1,1],
+    [1,1,1,1,1,1,1,1]
+];
+
+const GRID_SIZE = 60;
+const WORLD_SIZE = 8 * GRID_SIZE;
+
+// 機器人狀態
+let robot = { x: 1, y: 1, dir: 0 }; // dir: 0右, 1下, 2左, 3上
+let program = [];
+let isRunning = false;
+
+// 視角控制
+let camera = { x: 50, y: 50, zoom: 1, isDragging: false, lastPos: {x:0, y:0}, lastDist: 0 };
+
+function init() {
+    window.addEventListener('resize', resize);
+    resize();
+    setupInputs();
+    render();
+}
+
+function resize() {
+    canvas.width = document.getElementById('canvas-container').clientWidth;
+    canvas.height = document.getElementById('canvas-container').clientHeight;
+    // 初始置中
+    camera.x = canvas.width / 2 - WORLD_SIZE / 2;
+    camera.y = canvas.height / 2 - WORLD_SIZE / 2;
+}
+
+// --- 指令系統 ---
+function addCommand(type, label) {
+    if (isRunning) return;
+    program.push({ type, label });
+    updateProgramUI();
+}
+
+function clearProgram() {
+    program = [];
+    resetRobot();
+    updateProgramUI();
+}
+
+function updateProgramUI() {
+    programListEl.innerHTML = program.map((cmd, index) => `
+        <div class="program-step">
+            <span>${index + 1}. ${cmd.label}</span>
+            <span class="remove-btn" onclick="removeCommand(${index})">✕</span>
+        </div>
+    `).join('');
+}
+
+function removeCommand(index) {
+    program.splice(index, 1);
+    updateProgramUI();
+}
+
+function resetRobot() {
+    robot = { x: 1, y: 1, dir: 0 };
+    isRunning = false;
+}
+
+// --- 執行邏輯 (結構化程式解析) ---
+async function executeProgram() {
+    if (isRunning || program.length === 0) return;
+    isRunning = true;
+    resetRobot();
+
+    for (let cmd of program) {
+        if (!isRunning) break;
+        
+        if (cmd.type === 'FORWARD') {
+            await moveRobot();
+        } else if (cmd.type === 'RIGHT') {
+            robot.dir = (robot.dir + 1) % 4;
+            await sleep(300);
+        } else if (cmd.type === 'LEFT') {
+            robot.dir = (robot.dir + 3) % 4;
+            await sleep(300);
+        } else if (cmd.type === 'LOOP_3') {
+            // 重複結構範例
+            for(let i=0; i<3; i++) {
+                await moveRobot();
+            }
+        }
+        render();
+    }
+    
+    // 檢查是否到達終點
+    if (MAZE[robot.y][robot.x] === 3) {
+        alert("🎉 恭喜！成功運用結構化程式設計逃脫迷宮！");
+    } else {
+        alert("❌ 機器人迷路了，再檢查一下邏輯順序吧。");
+    }
+    isRunning = false;
+}
+
+async function moveRobot() {
+    let nx = robot.x;
+    let ny = robot.y;
+    if (robot.dir === 0) nx++;
+    if (robot.dir === 1) ny++;
+    if (robot.dir === 2) nx--;
+    if (robot.dir === 3) ny--;
+
+    if (MAZE[ny][nx] !== 1) {
+        robot.x = nx;
+        robot.y = ny;
+    }
+    render();
+    await sleep(400);
+}
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+// --- 繪圖系統 ---
+function render() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.translate(camera.x, camera.y);
+    ctx.scale(camera.zoom, camera.zoom);
+
+    // 畫迷宮
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            const tile = MAZE[row][col];
+            ctx.fillStyle = (tile === 1) ? "#16213e" : "#0f3460";
+            if (tile === 3) ctx.fillStyle = "#e94560"; // 終點
+            ctx.fillRect(col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE - 2, GRID_SIZE - 2);
+        }
+    }
+
+    // 畫機器人
+    ctx.save();
+    ctx.translate(robot.x * GRID_SIZE + GRID_SIZE/2, robot.y * GRID_SIZE + GRID_SIZE/2);
+    ctx.rotate(robot.dir * Math.PI / 2);
+    ctx.fillStyle = "#4ecca3";
+    // 簡單三角形代表前進方向
+    ctx.beginPath();
+    ctx.moveTo(15, 0);
+    ctx.lineTo(-10, -10);
+    ctx.lineTo(-10, 10);
+    ctx.fill();
+    ctx.restore();
+}
+
+// --- 互動控制 (滑鼠與多點觸控) ---
+function setupInputs() {
+    // 滑鼠縮放
+    canvas.addEventListener('wheel', (e) => {
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        camera.zoom *= delta;
+        camera.zoom = Math.max(0.5, Math.min(3, camera.zoom));
+        render();
+    }, { passive: true });
+
+    const getPos = (e) => {
+        const t = e.touches ? e.touches[0] : e;
+        return { x: t.clientX, y: t.clientY };
+    };
+
+    const handleStart = (e) => {
+        if (e.touches && e.touches.length === 2) {
+            camera.lastDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+        } else {
+            camera.isDragging = true;
+            camera.lastPos = getPos(e);
+        }
+    };
+
+    const handleMove = (e) => {
+        if (e.touches && e.touches.length === 2) {
+            const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            const delta = dist / camera.lastDist;
+            camera.zoom = Math.max(0.5, Math.min(3, camera.zoom * delta));
+            camera.lastDist = dist;
+        } else if (camera.isDragging) {
+            const pos = getPos(e);
+            camera.x += pos.x - camera.lastPos.x;
+            camera.y += pos.y - camera.lastPos.y;
+            camera.lastPos = pos;
+        }
+        render();
+    };
+
+    const handleEnd = () => { camera.isDragging = false; };
+
+    canvas.addEventListener('mousedown', handleStart);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+    canvas.addEventListener('touchstart', handleStart);
+    window.addEventListener('touchmove', handleMove);
+    window.addEventListener('touchend', handleEnd);
+}
+
+init();
+</script>
+</body>
+</html>
