@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>機器人迷宮逃脫 v0.12 - 結構化程式教學</title>
+    <title>機器人迷宮逃脫 v0.13 - 容器型結構化教學</title>
     <style>
         :root {
             --primary-bg: #1a1a2e;
@@ -26,105 +26,81 @@
             touch-action: none;
         }
 
-        #main-layout {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        @media (max-width: 850px) {
-            #main-layout { flex-direction: column; }
-        }
+        #main-layout { display: flex; flex: 1; overflow: hidden; }
+        @media (max-width: 850px) { #main-layout { flex-direction: column; } }
 
         /* 遊戲畫布區 */
         #canvas-container {
-            flex: 3;
-            position: relative;
-            background: #0f3460;
-            overflow: hidden;
+            flex: 3; position: relative; background: #0f3460; overflow: hidden;
         }
-
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-            cursor: grab;
-        }
-
+        canvas { display: block; width: 100%; height: 100%; cursor: grab; }
         canvas:active { cursor: grabbing; }
 
         /* 程式積木區 */
         #code-panel {
-            flex: 1.5;
-            background: var(--panel-bg);
-            border-left: 2px solid #0f3460;
-            display: flex;
-            flex-direction: column;
-            padding: 15px;
-            box-shadow: -5px 0 15px rgba(0,0,0,0.3);
-            z-index: 10;
+            flex: 1.5; background: var(--panel-bg); border-left: 2px solid #0f3460;
+            display: flex; flex-direction: column; padding: 15px;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.3); z-index: 10;
         }
 
         .section-title {
-            font-size: 1.1em;
-            font-weight: bold;
-            margin-bottom: 12px;
-            color: var(--accent);
-            border-left: 4px solid var(--accent);
-            padding-left: 10px;
+            font-size: 1.1em; font-weight: bold; margin-bottom: 12px;
+            color: var(--accent); border-left: 4px solid var(--accent); padding-left: 10px;
         }
 
-        .block-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
+        .block-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        
         .cmd-btn {
-            padding: 12px 5px;
-            border: none;
-            border-radius: 8px;
-            color: white;
-            cursor: pointer;
-            font-weight: bold;
-            transition: transform 0.1s;
+            padding: 12px 5px; border: none; border-radius: 8px; color: white;
+            cursor: pointer; font-weight: bold; transition: transform 0.1s;
         }
-
         .cmd-btn:active { transform: scale(0.95); }
         .btn-move { background: var(--block-move); }
-        .btn-loop { background: var(--block-loop); }
-        .btn-loop-end { background: #c0392b; grid-column: span 2; }
+        .btn-loop { background: var(--block-loop); grid-column: span 2; }
 
-        /* 程式列表 */
+        /* 程式列表與容器設計 */
         #program-list {
-            flex: 1;
-            background: rgba(0,0,0,0.2);
-            border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 15px;
-            overflow-y: auto;
-            border: 2px dashed #444;
+            flex: 1; background: rgba(0,0,0,0.2); border-radius: 8px;
+            padding: 10px; margin-bottom: 15px; overflow-y: auto; border: 2px dashed #444;
         }
 
-        .program-step {
-            margin: 6px 0;
-            padding: 10px;
-            border-radius: 6px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-left: 5px solid var(--accent);
-            transition: margin-left 0.2s;
+        .normal-step {
+            background: #243b55; margin: 6px 0; padding: 10px; border-radius: 6px;
+            display: flex; justify-content: space-between; align-items: center;
+            border-left: 5px solid var(--block-move);
         }
 
-        .remove-btn { color: #e94560; cursor: pointer; font-size: 1.2em; padding: 0 5px; }
+        .remove-btn { color: #e94560; cursor: pointer; font-size: 1.2em; padding: 0 5px; font-weight:bold; }
+
+        /* 迴圈容器專屬樣式 */
+        .loop-container {
+            background: rgba(230, 126, 34, 0.15);
+            border: 2px solid var(--block-loop); border-radius: 8px;
+            margin: 8px 0; padding: 8px; display: flex; flex-direction: column; gap: 8px;
+        }
+        .loop-header {
+            display: flex; justify-content: space-between; align-items: center;
+            font-weight: bold; color: #f39c12;
+        }
+        .loop-body {
+            background: rgba(0,0,0,0.4); border-radius: 6px; padding: 5px; min-height: 10px;
+        }
+        .loop-child-step {
+            background: #1a2a3a; margin: 4px 0; padding: 6px 10px; border-radius: 4px;
+            display: flex; justify-content: space-between; align-items: center; font-size: 0.9em;
+            border-left: 3px solid var(--block-loop);
+        }
+        .loop-actions { display: flex; gap: 5px; }
+        .loop-actions button {
+            flex: 1; padding: 6px; border: none; border-radius: 4px;
+            background: #2c3e50; color: white; cursor: pointer; border: 1px solid var(--block-loop);
+        }
+        .loop-actions button:hover { background: var(--block-loop); }
 
         .control-group { display: flex; gap: 10px; }
         .run-btn { flex: 2; background: var(--accent); color: #1a1a2e; font-weight: bold; padding: 15px; border-radius: 8px; border: none; cursor: pointer; font-size: 1em; }
         .clear-btn { flex: 1; background: #e94560; color: white; border: none; border-radius: 8px; cursor: pointer; }
 
-        /* 說明視窗 */
         #overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85);
             display: flex; align-items: center; justify-content: center; z-index: 100;
@@ -139,22 +115,20 @@
 
 <div id="overlay">
     <div class="modal">
-        <h2>🤖 機器人迷宮逃脫 v0.12</h2>
-        <p>運用「循序」與「巢狀重複」結構幫助機器人！</p>
-        <div style="text-align: left; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; font-size: 0.9em;">
-            📍 <b>操作說明：</b><br>
-            • 電腦：滾輪縮放地圖、左鍵拖曳移動視角。<br>
-            • 手機：雙指縮放地圖、單指拖曳移動視角。<br>
-            • 右側：點擊「重複 N 次」與「結束重複」可包覆多個指令。
+        <h2>🤖 機器人迷宮逃脫 v0.13</h2>
+        <p>「容器型積木」讓你輕鬆學習巢狀迴圈！</p>
+        <div style="text-align: left; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; font-size: 0.9em; line-height: 1.5;">
+            📍 <b>操作重點：</b><br>
+            • 加入「重複積木」後，它會產生一個專屬的橘色框框。<br>
+            • 請直接點擊<b>橘色框框下方的小按鈕</b>，把動作放進迴圈裡！<br>
+            • 不再需要手動設定「結束」位置，框框包住的都會重複執行。
         </div>
         <button class="run-btn" style="margin-top:20px;" onclick="document.getElementById('overlay').style.display='none'">開始學習</button>
     </div>
 </div>
 
 <div id="main-layout">
-    <div id="canvas-container">
-        <canvas id="gameCanvas"></canvas>
-    </div>
+    <div id="canvas-container"><canvas id="gameCanvas"></canvas></div>
 
     <div id="code-panel">
         <div class="section-title">指令積木盒</div>
@@ -162,8 +136,7 @@
             <button class="cmd-btn btn-move" onclick="addCommand('FORWARD', '⬆️ 前進 1 格')">⬆️ 前進</button>
             <button class="cmd-btn btn-move" onclick="addCommand('LEFT', '↩️ 左轉 90°')">↩️ 左轉</button>
             <button class="cmd-btn btn-move" onclick="addCommand('RIGHT', '↪️ 右轉 90°')">↪️ 右轉</button>
-            <button class="cmd-btn btn-loop" onclick="addLoop()">🔁 重複 N 次</button>
-            <button class="cmd-btn btn-loop-end" onclick="addCommand('LOOP_END', '🔚 結束重複')">🔚 結束重複</button>
+            <button class="cmd-btn btn-loop" onclick="addLoop()">🔁 建立「重複積木」容器</button>
         </div>
 
         <div class="section-title">我的程式清單</div>
@@ -177,15 +150,10 @@
 </div>
 
 <script>
-/**
- * 機器人迷宮 v0.12 核心邏輯
- * 新增功能：抽象語法樹解析 (AST)、巢狀迴圈、邊界防護
- */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const programListEl = document.getElementById('program-list');
 
-// 迷宮定義 (0:通道, 1:牆壁, 2:起點, 3:終點)
 const MAZE = [
     [1,1,1,1,1,1,1,1,1,1],
     [1,2,0,0,1,0,0,0,0,1],
@@ -201,18 +169,14 @@ const GRID_SIZE = 60;
 const ROWS = MAZE.length;
 const COLS = MAZE[0].length;
 
-// 狀態變數
-let robot = { x: 1, y: 1, dir: 0 }; // 0:右, 1:下, 2:左, 3:上
-let program = [];
+let robot = { x: 1, y: 1, dir: 0 }; 
+let program = []; // 直接使用樹狀結構陣列
 let isRunning = false;
 let camera = { x: 0, y: 0, zoom: 1, isDragging: false, lastMouse: {x:0, y:0}, lastDist: 0 };
 
 function init() {
     window.addEventListener('resize', resize);
-    resize();
-    centerCamera();
-    setupInputs();
-    animate();
+    resize(); centerCamera(); setupInputs(); animate();
 }
 
 function resize() {
@@ -226,34 +190,20 @@ function centerCamera() {
     camera.y = (canvas.height / camera.zoom - ROWS * GRID_SIZE) / 2;
 }
 
-// --- 互動功能 (視角控制) ---
 function setupInputs() {
     canvas.addEventListener('wheel', (e) => {
-        const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
-        camera.zoom *= zoomDelta;
-        camera.zoom = Math.max(0.2, Math.min(5, camera.zoom));
+        camera.zoom = Math.max(0.2, Math.min(5, camera.zoom * (e.deltaY > 0 ? 0.9 : 1.1)));
     }, { passive: true });
 
-    const getEvtPos = (e) => {
-        const t = e.touches ? e.touches[0] : e;
-        return { x: t.clientX, y: t.clientY };
-    };
-
+    const getEvtPos = (e) => ({ x: (e.touches ? e.touches[0] : e).clientX, y: (e.touches ? e.touches[0] : e).clientY });
     const onStart = (e) => {
-        if (e.touches && e.touches.length === 2) {
-            camera.lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-        } else {
-            camera.isDragging = true;
-            camera.lastMouse = getEvtPos(e);
-        }
+        if (e.touches && e.touches.length === 2) camera.lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        else { camera.isDragging = true; camera.lastMouse = getEvtPos(e); }
     };
-
     const onMove = (e) => {
         if (e.touches && e.touches.length === 2) {
             const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-            const ratio = dist / camera.lastDist;
-            camera.zoom *= ratio;
-            camera.lastDist = dist;
+            camera.zoom *= dist / camera.lastDist; camera.lastDist = dist;
         } else if (camera.isDragging) {
             const pos = getEvtPos(e);
             camera.x += (pos.x - camera.lastMouse.x) / camera.zoom;
@@ -261,36 +211,51 @@ function setupInputs() {
             camera.lastMouse = pos;
         }
     };
-
     const onEnd = () => { camera.isDragging = false; };
 
-    canvas.addEventListener('mousedown', onStart);
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onEnd);
-    canvas.addEventListener('touchstart', onStart, {passive:false});
-    window.addEventListener('touchmove', onMove, {passive:false});
-    window.addEventListener('touchend', onEnd);
+    canvas.addEventListener('mousedown', onStart); window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onEnd);
+    canvas.addEventListener('touchstart', onStart, {passive:false}); window.addEventListener('touchmove', onMove, {passive:false}); window.addEventListener('touchend', onEnd);
 }
 
-// --- 程式積木邏輯 ---
+// --- 容器型積木管理邏輯 ---
+
+// 新增一般指令到主程式
+function addCommand(type, label) {
+    if (isRunning) return;
+    program.push({ type, label });
+    renderProgramList();
+}
+
+// 新增一個「迴圈容器」
 function addLoop() {
     if (isRunning) return;
     let times = prompt("請輸入要重複的次數 (例如: 3)：", "3");
     times = parseInt(times);
     if (!isNaN(times) && times > 0) {
-        addCommand('LOOP_START', `🔁 重複 ${times} 次 {`, times);
+        // 迴圈本身就是一個帶有 children 陣列的節點
+        program.push({ type: 'LOOP', times: times, children: [] });
+        renderProgramList();
     }
 }
 
-function addCommand(type, label, times = 0) {
+// 專門為特定的迴圈容器新增子指令
+function addCommandToLoop(loopIndex, type, label) {
     if (isRunning) return;
-    program.push({ type, label, times });
+    program[loopIndex].children.push({ type, label });
     renderProgramList();
 }
 
+// 刪除主程式層級的指令
 function removeCommand(index) {
     if (isRunning) return;
     program.splice(index, 1);
+    renderProgramList();
+}
+
+// 刪除迴圈容器內的子指令
+function removeChildCommand(loopIndex, childIndex) {
+    if (isRunning) return;
+    program[loopIndex].children.splice(childIndex, 1);
     renderProgramList();
 }
 
@@ -301,58 +266,59 @@ function clearProgram() {
     renderProgramList();
 }
 
-// 視覺化縮排，建立區塊概念
+// 渲染 UI：分離一般指令與容器積木的呈現方式
 function renderProgramList() {
     let html = '';
-    let depth = 0;
     
     program.forEach((cmd, i) => {
-        if (cmd.type === 'LOOP_END') depth = Math.max(0, depth - 1);
-        
-        let indent = depth * 20;
-        let bg = cmd.type.includes('LOOP') ? '#d35400' : '#243b55';
-        let label = cmd.type === 'LOOP_END' ? '} 結束重複' : cmd.label;
-        
-        html += `
-            <div class="program-step" style="margin-left: ${indent}px; background: ${bg}">
-                <span>${i+1}. ${label}</span>
-                <span class="remove-btn" onclick="removeCommand(${i})">✕</span>
-            </div>
-        `;
-        
-        if (cmd.type === 'LOOP_START') depth++;
+        if (cmd.type === 'LOOP') {
+            // 渲染容器內的子指令
+            let childrenHtml = cmd.children.map((child, j) => `
+                <div class="loop-child-step">
+                    <span>${j+1}. ${child.label}</span>
+                    <span class="remove-btn" onclick="removeChildCommand(${i}, ${j})">✕</span>
+                </div>
+            `).join('');
+
+            // 渲染容器外框與專屬新增按鈕
+            html += `
+                <div class="loop-container">
+                    <div class="loop-header">
+                        <span>🔁 重複 ${cmd.times} 次 {</span>
+                        <span class="remove-btn" onclick="removeCommand(${i})">✕</span>
+                    </div>
+                    <div class="loop-body">
+                        ${childrenHtml}
+                    </div>
+                    <div class="loop-actions">
+                        <button onclick="addCommandToLoop(${i}, 'FORWARD', '⬆️ 前進 1 格')">+ ⬆️ 前進</button>
+                        <button onclick="addCommandToLoop(${i}, 'LEFT', '↩️ 左轉 90°')">+ ↩️ 左轉</button>
+                        <button onclick="addCommandToLoop(${i}, 'RIGHT', '↪️ 右轉 90°')">+ ↪️ 右轉</button>
+                    </div>
+                    <div class="loop-header" style="justify-content: flex-end; font-size: 0.9em;">}</div>
+                </div>
+            `;
+        } else {
+            // 渲染一般指令
+            html += `
+                <div class="normal-step">
+                    <span>${i+1}. ${cmd.label}</span>
+                    <span class="remove-btn" onclick="removeCommand(${i})">✕</span>
+                </div>
+            `;
+        }
     });
     programListEl.innerHTML = html;
 }
 
-// --- 執行引擎與語法樹 ---
+// --- 執行引擎 ---
 async function executeProgram() {
     if (isRunning || program.length === 0) return;
     isRunning = true;
-    robot = { x: 1, y: 1, dir: 0 }; // 重置機器人位置
+    robot = { x: 1, y: 1, dir: 0 };
     document.getElementById('runBtn').innerText = "執行中...";
 
-    // 建立語法樹 (將扁平陣列轉為樹狀結構)
-    function buildTree(flatProgram) {
-        let root = [];
-        let stack = [root];
-        for (let cmd of flatProgram) {
-            if (cmd.type === 'LOOP_START') {
-                let loopNode = { type: 'LOOP', times: cmd.times, children: [] };
-                stack[stack.length - 1].push(loopNode);
-                stack.push(loopNode.children);
-            } else if (cmd.type === 'LOOP_END') {
-                if (stack.length > 1) stack.pop();
-            } else {
-                stack[stack.length - 1].push(cmd);
-            }
-        }
-        return root;
-    }
-
-    const tree = buildTree(program);
-
-    // 遞迴執行樹狀節點
+    // 直接遞迴執行已經建立好的樹狀結構陣列
     async function runTree(nodes) {
         for (let node of nodes) {
             if (!isRunning) break;
@@ -361,54 +327,38 @@ async function executeProgram() {
             else if (node.type === 'RIGHT') { robot.dir = (robot.dir + 1) % 4; await sleep(400); }
             else if (node.type === 'LOOP') {
                 for (let i = 0; i < node.times; i++) {
-                    await runTree(node.children);
+                    await runTree(node.children); // 執行容器內的子指令
                 }
             }
         }
     }
 
-    await runTree(tree);
+    await runTree(program);
 
-    // 判定結果
-    if (MAZE[robot.y][robot.x] === 3) {
-        alert("🏆 成功！你掌握了結構化程式設計！");
-    } else {
-        alert("💡 機器人還沒抵達終點，請再檢查一下指令順序。");
-    }
+    if (MAZE[robot.y][robot.x] === 3) alert("🏆 成功！你掌握了結構化程式設計！");
+    else alert("💡 機器人還沒抵達終點，請再檢查一下指令順序。");
 
     isRunning = false;
     document.getElementById('runBtn').innerText = "▶ 執行程式";
 }
 
-// 嚴謹的邊界防護與移動判定
 async function moveOneStep() {
     let nx = robot.x, ny = robot.y;
-    if (robot.dir === 0) nx++;
-    else if (robot.dir === 1) ny++;
-    else if (robot.dir === 2) nx--;
-    else if (robot.dir === 3) ny--;
+    if (robot.dir === 0) nx++; else if (robot.dir === 1) ny++; else if (robot.dir === 2) nx--; else if (robot.dir === 3) ny--;
 
-    // 檢查目標座標是否在陣列範圍內，避免讀取 undefined
+    // 嚴謹邊界防護
     if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS) {
-        if (MAZE[ny][nx] !== 1) { // 確保不是牆壁
-            robot.x = nx; 
-            robot.y = ny;
-        }
+        if (MAZE[ny][nx] !== 1) { robot.x = nx; robot.y = ny; }
     }
-    await sleep(400); // 動畫延遲
+    await sleep(400);
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// --- 繪圖循環 ---
 function animate() {
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.scale(camera.zoom, camera.zoom); ctx.translate(camera.x, camera.y);
 
-    ctx.scale(camera.zoom, camera.zoom);
-    ctx.translate(camera.x, camera.y);
-
-    // 畫迷宮
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
             const tile = MAZE[r][c];
@@ -416,36 +366,18 @@ function animate() {
             if (tile === 3) ctx.fillStyle = "#e94560";
             if (tile === 2) ctx.fillStyle = "#1a1a2e";
             ctx.fillRect(c * GRID_SIZE, r * GRID_SIZE, GRID_SIZE - 2, GRID_SIZE - 2);
-            
-            if (tile === 3) {
-                ctx.fillStyle = "white";
-                ctx.font = "20px Arial";
-                ctx.fillText("GOAL", c * GRID_SIZE + 5, r * GRID_SIZE + 35);
-            }
+            if (tile === 3) { ctx.fillStyle = "white"; ctx.font = "20px Arial"; ctx.fillText("GOAL", c * GRID_SIZE + 5, r * GRID_SIZE + 35); }
         }
     }
 
-    // 畫機器人
-    const rx = robot.x * GRID_SIZE + GRID_SIZE / 2;
-    const ry = robot.y * GRID_SIZE + GRID_SIZE / 2;
-    ctx.save();
-    ctx.translate(rx, ry);
-    ctx.rotate(robot.dir * Math.PI / 2);
-    
-    // 機器人本體
-    ctx.fillStyle = varColor('--accent');
+    const rx = robot.x * GRID_SIZE + GRID_SIZE / 2, ry = robot.y * GRID_SIZE + GRID_SIZE / 2;
+    ctx.save(); ctx.translate(rx, ry); ctx.rotate(robot.dir * Math.PI / 2);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
     ctx.fillRect(-20, -20, 40, 40);
-    // 眼睛(方向標示)
-    ctx.fillStyle = "white";
-    ctx.fillRect(10, -15, 5, 5);
-    ctx.fillRect(10, 10, 5, 5);
+    ctx.fillStyle = "white"; ctx.fillRect(10, -15, 5, 5); ctx.fillRect(10, 10, 5, 5);
     ctx.restore();
 
     requestAnimationFrame(animate);
-}
-
-function varColor(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
 init();
