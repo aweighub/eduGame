@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>機器人迷宮逃脫 v0.11 - 結構化程式教學</title>
+    <title>機器人迷宮逃脫 v0.12 - 結構化程式教學</title>
     <style>
         :root {
             --primary-bg: #1a1a2e;
@@ -23,7 +23,7 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            touch-action: none; /* 防止手機瀏覽器預設縮放干擾遊戲 */
+            touch-action: none;
         }
 
         #main-layout {
@@ -94,6 +94,7 @@
         .cmd-btn:active { transform: scale(0.95); }
         .btn-move { background: var(--block-move); }
         .btn-loop { background: var(--block-loop); }
+        .btn-loop-end { background: #c0392b; grid-column: span 2; }
 
         /* 程式列表 */
         #program-list {
@@ -107,7 +108,6 @@
         }
 
         .program-step {
-            background: #243b55;
             margin: 6px 0;
             padding: 10px;
             border-radius: 6px;
@@ -115,6 +115,7 @@
             justify-content: space-between;
             align-items: center;
             border-left: 5px solid var(--accent);
+            transition: margin-left 0.2s;
         }
 
         .remove-btn { color: #e94560; cursor: pointer; font-size: 1.2em; padding: 0 5px; }
@@ -138,13 +139,13 @@
 
 <div id="overlay">
     <div class="modal">
-        <h2>🤖 機器人迷宮逃脫 v0.11</h2>
-        <p>運用「循序」與「重複」結構幫助機器人！</p>
+        <h2>🤖 機器人迷宮逃脫 v0.12</h2>
+        <p>運用「循序」與「巢狀重複」結構幫助機器人！</p>
         <div style="text-align: left; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; font-size: 0.9em;">
             📍 <b>操作說明：</b><br>
             • 電腦：滾輪縮放地圖、左鍵拖曳移動視角。<br>
             • 手機：雙指縮放地圖、單指拖曳移動視角。<br>
-            • 右側：點擊指令加入清單，按下「執行」開始。
+            • 右側：點擊「重複 N 次」與「結束重複」可包覆多個指令。
         </div>
         <button class="run-btn" style="margin-top:20px;" onclick="document.getElementById('overlay').style.display='none'">開始學習</button>
     </div>
@@ -158,10 +159,11 @@
     <div id="code-panel">
         <div class="section-title">指令積木盒</div>
         <div class="block-group">
-            <button class="cmd-btn btn-move" onclick="addCommand('FORWARD', '前進 1 格')">⬆️ 前進</button>
-            <button class="cmd-btn btn-move" onclick="addCommand('LEFT', '左轉 90°')">↩️ 左轉</button>
-            <button class="cmd-btn btn-move" onclick="addCommand('RIGHT', '右轉 90°')">↪️ 右轉</button>
-            <button class="cmd-btn btn-loop" onclick="addCommand('LOOP_3', '重複 3 次')">🔁 重複 3x</button>
+            <button class="cmd-btn btn-move" onclick="addCommand('FORWARD', '⬆️ 前進 1 格')">⬆️ 前進</button>
+            <button class="cmd-btn btn-move" onclick="addCommand('LEFT', '↩️ 左轉 90°')">↩️ 左轉</button>
+            <button class="cmd-btn btn-move" onclick="addCommand('RIGHT', '↪️ 右轉 90°')">↪️ 右轉</button>
+            <button class="cmd-btn btn-loop" onclick="addLoop()">🔁 重複 N 次</button>
+            <button class="cmd-btn btn-loop-end" onclick="addCommand('LOOP_END', '🔚 結束重複')">🔚 結束重複</button>
         </div>
 
         <div class="section-title">我的程式清單</div>
@@ -176,7 +178,8 @@
 
 <script>
 /**
- * 機器人迷宮 v0.11 核心邏輯
+ * 機器人迷宮 v0.12 核心邏輯
+ * 新增功能：抽象語法樹解析 (AST)、巢狀迴圈、邊界防護
  */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -223,16 +226,14 @@ function centerCamera() {
     camera.y = (canvas.height / camera.zoom - ROWS * GRID_SIZE) / 2;
 }
 
-// --- 互動功能 ---
+// --- 互動功能 (視角控制) ---
 function setupInputs() {
-    // 滑鼠滾輪
     canvas.addEventListener('wheel', (e) => {
         const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
         camera.zoom *= zoomDelta;
         camera.zoom = Math.max(0.2, Math.min(5, camera.zoom));
     }, { passive: true });
 
-    // 觸控與滑鼠共通
     const getEvtPos = (e) => {
         const t = e.touches ? e.touches[0] : e;
         return { x: t.clientX, y: t.clientY };
@@ -272,9 +273,18 @@ function setupInputs() {
 }
 
 // --- 程式積木邏輯 ---
-function addCommand(type, label) {
+function addLoop() {
     if (isRunning) return;
-    program.push({ type, label });
+    let times = prompt("請輸入要重複的次數 (例如: 3)：", "3");
+    times = parseInt(times);
+    if (!isNaN(times) && times > 0) {
+        addCommand('LOOP_START', `🔁 重複 ${times} 次 {`, times);
+    }
+}
+
+function addCommand(type, label, times = 0) {
+    if (isRunning) return;
+    program.push({ type, label, times });
     renderProgramList();
 }
 
@@ -291,37 +301,86 @@ function clearProgram() {
     renderProgramList();
 }
 
+// 視覺化縮排，建立區塊概念
 function renderProgramList() {
-    programListEl.innerHTML = program.map((cmd, i) => `
-        <div class="program-step">
-            <span>${i+1}. ${cmd.label}</span>
-            <span class="remove-btn" onclick="removeCommand(${i})">✕</span>
-        </div>
-    `).join('');
+    let html = '';
+    let depth = 0;
+    
+    program.forEach((cmd, i) => {
+        if (cmd.type === 'LOOP_END') depth = Math.max(0, depth - 1);
+        
+        let indent = depth * 20;
+        let bg = cmd.type.includes('LOOP') ? '#d35400' : '#243b55';
+        let label = cmd.type === 'LOOP_END' ? '} 結束重複' : cmd.label;
+        
+        html += `
+            <div class="program-step" style="margin-left: ${indent}px; background: ${bg}">
+                <span>${i+1}. ${label}</span>
+                <span class="remove-btn" onclick="removeCommand(${i})">✕</span>
+            </div>
+        `;
+        
+        if (cmd.type === 'LOOP_START') depth++;
+    });
+    programListEl.innerHTML = html;
 }
 
+// --- 執行引擎與語法樹 ---
 async function executeProgram() {
     if (isRunning || program.length === 0) return;
     isRunning = true;
-    robot = { x: 1, y: 1, dir: 0 };
+    robot = { x: 1, y: 1, dir: 0 }; // 重置機器人位置
     document.getElementById('runBtn').innerText = "執行中...";
 
-    for (let cmd of program) {
-        if (cmd.type === 'FORWARD') await moveOneStep();
-        else if (cmd.type === 'LEFT') { robot.dir = (robot.dir + 3) % 4; await sleep(400); }
-        else if (cmd.type === 'RIGHT') { robot.dir = (robot.dir + 1) % 4; await sleep(400); }
-        else if (cmd.type === 'LOOP_3') {
-            for(let j=0; j<3; j++) await moveOneStep();
+    // 建立語法樹 (將扁平陣列轉為樹狀結構)
+    function buildTree(flatProgram) {
+        let root = [];
+        let stack = [root];
+        for (let cmd of flatProgram) {
+            if (cmd.type === 'LOOP_START') {
+                let loopNode = { type: 'LOOP', times: cmd.times, children: [] };
+                stack[stack.length - 1].push(loopNode);
+                stack.push(loopNode.children);
+            } else if (cmd.type === 'LOOP_END') {
+                if (stack.length > 1) stack.pop();
+            } else {
+                stack[stack.length - 1].push(cmd);
+            }
+        }
+        return root;
+    }
+
+    const tree = buildTree(program);
+
+    // 遞迴執行樹狀節點
+    async function runTree(nodes) {
+        for (let node of nodes) {
+            if (!isRunning) break;
+            if (node.type === 'FORWARD') await moveOneStep();
+            else if (node.type === 'LEFT') { robot.dir = (robot.dir + 3) % 4; await sleep(400); }
+            else if (node.type === 'RIGHT') { robot.dir = (robot.dir + 1) % 4; await sleep(400); }
+            else if (node.type === 'LOOP') {
+                for (let i = 0; i < node.times; i++) {
+                    await runTree(node.children);
+                }
+            }
         }
     }
 
-    if (MAZE[robot.y][robot.x] === 3) alert("🏆 成功！你掌握了結構化程式設計！");
-    else alert("💡 機器人還沒抵達終點，請再檢查一下指令順序。");
+    await runTree(tree);
+
+    // 判定結果
+    if (MAZE[robot.y][robot.x] === 3) {
+        alert("🏆 成功！你掌握了結構化程式設計！");
+    } else {
+        alert("💡 機器人還沒抵達終點，請再檢查一下指令順序。");
+    }
 
     isRunning = false;
     document.getElementById('runBtn').innerText = "▶ 執行程式";
 }
 
+// 嚴謹的邊界防護與移動判定
 async function moveOneStep() {
     let nx = robot.x, ny = robot.y;
     if (robot.dir === 0) nx++;
@@ -329,10 +388,14 @@ async function moveOneStep() {
     else if (robot.dir === 2) nx--;
     else if (robot.dir === 3) ny--;
 
-    if (MAZE[ny] && MAZE[ny][nx] !== 1) {
-        robot.x = nx; robot.y = ny;
+    // 檢查目標座標是否在陣列範圍內，避免讀取 undefined
+    if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS) {
+        if (MAZE[ny][nx] !== 1) { // 確保不是牆壁
+            robot.x = nx; 
+            robot.y = ny;
+        }
     }
-    await sleep(400);
+    await sleep(400); // 動畫延遲
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
